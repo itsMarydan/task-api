@@ -24,7 +24,7 @@ Returns:
     "id": 42,
     "title": "Get a coffee",
     "description": "Get a coffee, make sure it's a really good one!",
-    "due_date": 2024-07-01,
+    "due_date": 2024-07-02,
     "completed": false,
     "created_at": 2023-07-01,
     "created_by": "Jane Doe"
