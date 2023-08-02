@@ -1,5 +1,5 @@
 version: '3.9'
-services:   
+services:
   postgres:
     container_name: postgres
     image: postgres:13.3-alpine
@@ -11,7 +11,7 @@ services:
       - 5432:5432
   task-list-api:
     container_name: auth
-    image: itsmarydan/task-list-api:20230708-130bf4d
+    image: itsmarydan/task-list-api:latest
     depends_on:
       - postgres
     environment:
