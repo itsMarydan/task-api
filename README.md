@@ -124,3 +124,22 @@ USER table:
 - first_name (string)
 - last_name (string)
 ```
+
+
+
+## Start UVICORN SERVER LOCALLY
+
+```
+cd task-list
+uvicorn api.main:app --reload
+```
+
+## Start Build Application as Container 
+
+```
+cd task-list
+
+chmod u+x build.sh
+
+./build.sh
+```
