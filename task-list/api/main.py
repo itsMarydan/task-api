@@ -1,69 +1,231 @@
-from fastapi import FastAPI, HTTPException, Depends, status
-from sqlalchemy.orm import Session
-from sqlalchemy import or_
+import csv
 import datetime
-from faker import Faker
-import schemas, models
+import json
+import logging
 
-from db import get_db, engine, Base
+from io import StringIO
+from typing import List
+
+from faker import Faker
+from fastapi import FastAPI, Depends, status, UploadFile, HTTPException
+from fastapi.param_functions import File
+from sqlalchemy import or_
+from sqlalchemy.orm import Session
+
+from api.helpers.log import log
+from api.helpers.procees_data import process_csv
+from api.models import TaskEntity
+from api.schemas import TaskSchema, BulkDeleteData
+from api.service.task_service import TaskService
+from api.db import get_db, engine, Base, SessionLocal
 
 # Initialize FastAPI app
 app = FastAPI()
 
+
 # Create the database tables
-Base.metadata.create_all(bind=engine)
+# Base.metadata.create_all(bind=engine)
+
 
 @app.get("/")
 def root():
     return "Task API is running"
 
+
 # Get all tasks
+# @app.get("/tasks")
+# def get_tasks(db: Session = Depends(get_db), search: str = ''):
+#     tasks = db.query(TaskEntity).filter(or_(
+#         TaskEntity.title.contains(search),
+#         TaskEntity.description.contains(search))).all()
+#     return {"status": "success", "task": tasks}
+
+
 @app.get("/tasks")
-def get_tasks(db: Session = Depends(get_db), search: str = ''):
-    tasks = db.query(models.TaskEntity).filter(or_(
-        models.TaskEntity.title.contains(search),
-        models.TaskEntity.description.contains(search))).all()
-    return {"status": "success", "task": tasks}
+def get_tasks():
+    log.info("Starting session")
+    session = SessionLocal()
+    service = TaskService(session)
+    try:
+        tasks = service.get_all()
+        return {"status": "success", "task": tasks}
+    except Exception as e:
+        log.error(f"Error getting tasks: {e}")
+        return {"status": "error", "message": "Error getting tasks"}
+    finally:
+        log.info("Closing session")
+        session.close()
+
 
 # Get single task by id
 @app.get("/tasks/{task_id}")
-def get_task(task_id: int, db: Session = Depends(get_db)):
-    task = db.query(models.TaskEntity).filter(models.TaskEntity.id == task_id).first()
-    if not task: raise HTTPException(status_code=404, detail="Task not found")
-    return {"status": "success", "task": task}
+def get_task(task_id: int):
+    session = SessionLocal()
+    service = TaskService(session)
+    try:
+        task = service.get(task_id)
+        if task is None:
+            return {"status": "error", "message": "Task not found"}
+        return {"status": "success", "task": task}
+    except Exception as e:
+        log.error(f"Error getting task: {e}")
+        return {"status": "error", "message": "Error getting task"}
+    finally:
+        session.close()
+
 
 # Create task
 @app.post("/tasks", status_code=status.HTTP_201_CREATED)
-def create_task(task: schemas.TaskSchema, db: Session = Depends(get_db)):
-    new_task = models.TaskEntity(**task.dict())
-    db.add(new_task)
-    db.commit()
-    db.refresh(new_task)
-    return {"status": "success", "task": new_task}
+def create_task(task: TaskSchema):
+    session = SessionLocal()
+    service = TaskService(session)
+    log.info(f"Creating task: {task}")
+    data = task.model_dump()
+    try:
+        new_task = service.create(data)
+        if new_task is None:
+            raise HTTPException(status_code=400, detail="Error creating task")
+        return {"status": "success", "task": new_task}
+    except Exception as e:
+        log.error(f"Error creating task: {e}")
+        return {"status": "error", "message": "Error creating task"}
+    finally:
+        session.close()
+
 
 # Update task
-@app.put("/tasks/{task_id}", status_code=status.HTTP_201_CREATED)
-def update_task(task_id: int, task: schemas.TaskSchema, db: Session = Depends(get_db)):
-    existing_task = db.query(models.TaskEntity).filter(models.TaskEntity.id == task_id).first()
-    if not existing_task: raise HTTPException(status_code=404, detail="Task not found")
+@app.put("/tasks/{task_id}")
+def update_task(task_id: int, task: TaskSchema):
+    session = SessionLocal()
+    service = TaskService(session)
+    log.info(f"Updating task: {task}")
+    data = task.model_dump()
+    try:
+        find_task = service.get(task_id)
+        if find_task is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        updated_task = service.update(task_id, data)
+        if updated_task is False:
+            raise HTTPException(status_code=400, detail="Error updating task")
+        return {"status": "success", "task": "Task updated successfully"}
+    except Exception as e:
+        log.error(f"Error updating task: {e}")
+        return {"status": "error", "message": "Error updating task"}
+    finally:
+        session.close()
 
-    # map the updated fields to the task object
-    for k, v in task.dict().items(): setattr(existing_task, k, v)
-
-    db.commit()
-    db.refresh(existing_task)
-    return {"status": "success", "task": existing_task}
 
 # Delete task
 @app.delete("/tasks/{task_id}")
-def delete_task(task_id: int, db: Session = Depends(get_db)):
-    task = db.query(models.TaskEntity).filter(models.TaskEntity.id == task_id).first()
-    if not task: raise HTTPException(status_code=404, detail="Task not found")
+def delete_task(task_id: int):
+    session = SessionLocal()
+    service = TaskService(session)
+    log.info(f"Deleting task: {task_id}")
+    try:
+        find_task = service.get(task_id)
+        if find_task is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        deleted_task = service.delete(task_id)
+        if deleted_task is False:
+            raise HTTPException(status_code=400, detail="Error deleting task")
+        return {"status": "success", "task": "Task deleted successfully"}
+    except Exception as e:
+        log.error(f"Error deleting task: {e}")
+        return {"status": "error", "message": "Error deleting task"}
+    finally:
+        session.close()
 
-    db.delete(task)
-    db.commit()
-    return {"status": "success", "task": task}
 
+# Bulk create tasks
+
+@app.post("/tasks/bulk")
+async def bulk_create_tasks(file: UploadFile):
+    session = SessionLocal()
+    service = TaskService(session)
+    log.info(f"File name: {file.filename}")
+    try:
+        if file.filename.endswith('.json'):
+            contents = await file.read()
+            data = json.loads(contents)
+            log.info(f"Data from json: {data}")
+        elif file.filename.endswith('.csv'):
+            contents = await file.read()
+            contents_string = contents.decode("utf-8")
+            csv_file = StringIO(contents_string)
+            tasks = list(csv.DictReader(csv_file))
+            data = process_csv(tasks)
+            log.info(f"Data from csv: {data}")
+        else:
+            raise HTTPException(status_code=400, detail="File type not supported")
+        result = service.bulk_create(data)
+        log.info(f"Result: {result}")
+        if result['status']:
+            log.info(f"Message: {result['message']}")
+            return {"status": "success", "response": result['message']}
+        else:
+            raise HTTPException(status_code=400, detail=result['message'])
+    except Exception as e:
+        log.error(f"Error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        session.close()
+
+
+# Bulk update tasks
+
+@app.patch("/tasks/bulk")
+async def bulk_update_tasks(file: UploadFile):
+    session = SessionLocal()
+    service = TaskService(session)
+    log.info(f"File name: {file.filename}")
+    try:
+        if file.filename.endswith('.json'):
+            contents = await file.read()
+            data = json.loads(contents)
+            log.info(f"Data from json: {data}")
+        elif file.filename.endswith('.csv'):
+            contents = await file.read()
+            contents_string = contents.decode("utf-8")
+            csv_file = StringIO(contents_string)
+            tasks = list(csv.DictReader(csv_file))
+            data = process_csv(tasks)
+            log.info(f"Data from csv: {data}")
+        else:
+            raise HTTPException(status_code=400, detail="File type not supported")
+        result = service.bulk_update(data)
+        log.info(f"Result: {result}")
+        if result['status']:
+            log.info(f"Message: {result['message']}")
+            return {"status": "success", "response": result['message']}
+        else:
+            raise HTTPException(status_code=400, detail=result['message'])
+    except Exception as e:
+        log.error(f"Error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        session.close()
+
+
+# Bulk delete tasks
+
+@app.patch("/tasks/bulk/delete")
+async def bulk_delete_tasks(data: BulkDeleteData):
+    session = SessionLocal()
+    service = TaskService(session)
+    data = data.data
+    try:
+        result = service.bulk_delete(data)
+        log.info(f"Result: {result}")
+        if result:
+            log.info(f"Message: {result}")
+            return {"status": "success", "response": result}
+        else:
+            raise HTTPException(status_code=400, detail=result)
+    except Exception as e:
+        log.error(f"Error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        session.close()
 
 ################################
 ## FOR TESTING PURPOSES ONLY ##
@@ -74,15 +236,18 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
 def seed_task(db: Session = Depends(get_db)):
     for i in range(1, 200):
         fake = Faker()
-        t =  schemas.TaskSchema(title=fake.text(20), description=fake.text(), completed=False, due_date=datetime.datetime.now() , created_by=fake.name())
-        new_task = models.TaskEntity(**t.dict())
+        t = TaskSchema(title=fake.text(20), description=fake.text(), completed=False, due_date=datetime.datetime.now(),
+                       created_by=fake.name())
+        print(t)
+        new_task = TaskEntity(**t.dict())
         db.add(new_task)
         db.commit()
     return {"status": "seeded tasks"}
 
+
 # clear database
 @app.delete("/tasks/delete/", status_code=status.HTTP_200_OK)
 def seed_task(db: Session = Depends(get_db)):
-    db.query(models.TaskEntity).delete()
+    db.query(TaskEntity).delete()
     db.commit()
     return {"status": "deleted all tasks"}

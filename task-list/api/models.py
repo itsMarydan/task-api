@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, TIMESTAMP, Column
 from sqlalchemy.sql import func
-from db import Base
+from api.db import Base
+
 
 class TaskEntity(Base):
     __tablename__ = "tasks"
