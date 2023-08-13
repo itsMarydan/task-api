@@ -2,26 +2,51 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import List
 
-class TaskSchema(BaseModel):
+class UserBaseSchema(BaseModel):
+    fname: str
+    lname: str
+
+    class Config:
+        orm_mode = True
+
+class UserSchema(UserBaseSchema):
+    id: int
+
+class UserPostSchema(UserBaseSchema):
+    fname: str
+    lname: str
+
+class UserUpdateSchema(UserBaseSchema):
+    fname: str
+    lname: str
+
+class TaskBaseSchema(BaseModel):
     title: str
     description: str
     completed: bool
     due_date: datetime
-    created_by: str
+
+    class Config:
+        orm_mode = True
+
+class TaskSchema(TaskBaseSchema):
+    id: int
+    title: str
+    description: str
+    completed: bool
+    due_date: datetime
     user_id: int
-    user: "UserSchema"
+    user: 'UserSchema'
 
-    class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
+class TaskPostSchema(TaskBaseSchema):
+    title: str
+    description: str
+    completed: bool
+    due_date: datetime
+    user_id: int
 
-class UserSchema(BaseModel):
-    fname: str
-    lname: str
-    tasks: List["TaskSchema"]
-
-    class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
+class TaskUpdateSchema(TaskBaseSchema):
+    title: str
+    description: str
+    completed: bool
+    due_date: datetime
