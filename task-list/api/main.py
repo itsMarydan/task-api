@@ -1,23 +1,14 @@
 import csv
-import datetime
 import json
-import logging
-
 from io import StringIO
-from typing import List
 
-from faker import Faker
-from fastapi import FastAPI, Depends, status, UploadFile, HTTPException
-from fastapi.param_functions import File
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from fastapi import FastAPI, status, UploadFile, HTTPException
 
+from api.db import SessionLocal
 from api.helpers.log import log
 from api.helpers.procees_data import process_csv
-from api.models import TaskEntity
 from api.schemas import TaskSchema, BulkDeleteData
 from api.service.task_service import TaskService
-from api.db import get_db, engine, Base, SessionLocal
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -25,6 +16,28 @@ app = FastAPI()
 
 # Create the database tables
 # Base.metadata.create_all(bind=engine)
+
+@app.on_event("startup")
+def startup_event():
+    log.info("Starting up")
+    log.info("Creating tables")
+    ## TODO
+
+    csv_file = open('tasks.csv', 'r')
+    tasks = list(csv.DictReader(csv_file))
+    data = process_csv(tasks)
+    session = SessionLocal()
+    try:
+        service = TaskService(session)
+        service.bulk_create(data)
+        log.info("Created tables")
+    except Exception as e:
+        log.error(f"Error creating tables: {e}")
+        session.rollback()
+    finally:
+        session.close()
+
+
 
 
 @app.get("/")
@@ -208,7 +221,7 @@ async def bulk_update_tasks(file: UploadFile):
 
 # Bulk delete tasks
 
-@app.patch("/tasks/bulk/delete")
+@app.delete("/tasks/bulk")
 async def bulk_delete_tasks(data: BulkDeleteData):
     session = SessionLocal()
     service = TaskService(session)
@@ -227,27 +240,29 @@ async def bulk_delete_tasks(data: BulkDeleteData):
     finally:
         session.close()
 
+
 ################################
 ## FOR TESTING PURPOSES ONLY ##
 ################################
 
-# seed database with tasks
-@app.get("/tasks/seed/", status_code=status.HTTP_201_CREATED)
-def seed_task(db: Session = Depends(get_db)):
-    for i in range(1, 200):
-        fake = Faker()
-        t = TaskSchema(title=fake.text(20), description=fake.text(), completed=False, due_date=datetime.datetime.now(),
-                       created_by=fake.name())
-        print(t)
-        new_task = TaskEntity(**t.dict())
-        db.add(new_task)
-        db.commit()
-    return {"status": "seeded tasks"}
+# # seed database with tasks
+# @app.get("/tasks/seed/", status_code=status.HTTP_201_CREATED)
+# def seed_task(db: Session = Depends(get_db)):
+#     for i in range(1, 200):
+#         fake = Faker()
+#         t = TaskSchema(title=fake.text(20), description=fake.text(), completed=False, due_date=datetime.datetime.now(),
+#                        created_by=fake.name())
+#         print(t)
+#         new_task = TaskEntity(**t.dict())
+#         db.add(new_task)
+#         db.commit()
+#     return {"status": "seeded tasks"}
 
 
 # clear database
 @app.delete("/tasks/delete/", status_code=status.HTTP_200_OK)
-def seed_task(db: Session = Depends(get_db)):
-    db.query(TaskEntity).delete()
-    db.commit()
+def seed_task():
+    session = SessionLocal()
+    service = TaskService(session)
+    service.delete_all()
     return {"status": "deleted all tasks"}

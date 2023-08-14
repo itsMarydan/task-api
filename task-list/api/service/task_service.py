@@ -21,6 +21,9 @@ class TaskService:
     def delete(self, task_id):
         return self.repo.delete(task_id)
 
+    def delete_all(self):
+        return self.repo.delete_all()
+
     def bulk_create(self, tasks_data, chunk_size=100):
         return self.repo.bulk_create(tasks_data, chunk_size)
 
@@ -35,3 +38,5 @@ class TaskService:
 
     def filter_by_status_and_due_date(self, completed, due_date):
         return self.repo.filter(status=completed, priority=due_date)
+
+

@@ -161,3 +161,15 @@ class TaskRepo:
             self.session.rollback()
             log.error(f"Error deleting tasks: {e}")
             return False
+
+    def delete_all(self):
+        try:
+            stmt = delete(TaskEntity)
+            self.session.execute(stmt)
+            self.session.commit()
+            log.info(f"Deleted all tasks")
+            return True
+        except Exception as e:
+            self.session.rollback()
+            log.error(f"Error deleting all tasks: {e}")
+            return False
