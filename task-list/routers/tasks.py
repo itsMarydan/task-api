@@ -7,7 +7,6 @@ from models import models
 from log import log
 from db import get_db
 
-
 # Initialize FastAPI app
 router = APIRouter()
 

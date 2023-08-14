@@ -1,12 +1,10 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
-from typing import List
 from schemas import schemas
 from models import models
 from log import log
 from db import get_db
 from faker import Faker
-import datetime
 
 
 # Initialize FastAPI app

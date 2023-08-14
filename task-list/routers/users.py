@@ -4,7 +4,7 @@ from sqlalchemy import or_
 from schemas import schemas
 from models import models
 from log import log
-from db import get_db, engine, Base
+from db import get_db
 
 # Initialize FastAPI app
 router = APIRouter()
