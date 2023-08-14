@@ -5,6 +5,7 @@ import datetime
 from faker import Faker
 import schemas, models
 from typing import List
+from log import log
 
 from db import get_db, engine, Base
 
@@ -32,6 +33,7 @@ def get_tasks(db: Session = Depends(get_db), search: str = ''):
 # Get single task by id
 @app.get("/tasks/{task_id}",response_model=schemas.TaskSchema)
 def get_task(task_id: int, db: Session = Depends(get_db)):
+    log.info("GET: tasks")
     task = db.query(models.TaskEntity) \
         .options(joinedload(models.TaskEntity.user)) \
         .filter(models.TaskEntity.id == task_id).first()
@@ -42,6 +44,7 @@ def get_task(task_id: int, db: Session = Depends(get_db)):
 # Create task
 @app.post("/tasks", response_model=schemas.TaskSchema)
 def create_task(task: schemas.TaskPostSchema, db: Session = Depends(get_db)):
+    log.info("POST: tasks")
     new_task = models.TaskEntity(**task.dict())
     db.add(new_task)
     db.commit()
@@ -51,6 +54,7 @@ def create_task(task: schemas.TaskPostSchema, db: Session = Depends(get_db)):
 # Update task
 @app.put("/tasks/{task_id}")
 def update_task(task_id: int, task: schemas.TaskUpdateSchema, db: Session = Depends(get_db)):
+    log.info("PUT: tasks")
     existing_task = db.query(models.TaskEntity).filter(models.TaskEntity.id == task_id).first()
     if not existing_task: raise HTTPException(status_code=404, detail="Task not found")
 
@@ -64,6 +68,7 @@ def update_task(task_id: int, task: schemas.TaskUpdateSchema, db: Session = Depe
 # Delete task
 @app.delete("/tasks/{task_id}")
 def delete_task(task_id: int, db: Session = Depends(get_db)):
+    log.info("DELETE: tasks")
     task = db.query(models.TaskEntity).filter(models.TaskEntity.id == task_id).first()
     if not task: raise HTTPException(status_code=404, detail="Task not found")
 
@@ -78,6 +83,7 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
 # Get all users
 @app.get("/users")
 def get_users(db: Session = Depends(get_db), search: str = ''):
+    log.info("GET: users")
     users = db.query(models.UserEntity) \
         .filter(or_(
         models.UserEntity.fname.contains(search),
@@ -107,6 +113,7 @@ def create_user(user: schemas.UserPostSchema, db: Session = Depends(get_db)):
 # Update user
 @app.put("/users/{user_id}", status_code=status.HTTP_201_CREATED)
 def update_user(user_id: int, user: schemas.UserUpdateSchema, db: Session = Depends(get_db)):
+    log.info("PUT: users")
     existing_user = db.query(models.UserEntity).filter(models.UserEntity.id == user_id).first()
     if not existing_user: raise HTTPException(status_code=404, detail="User not found")
 
@@ -120,6 +127,7 @@ def update_user(user_id: int, user: schemas.UserUpdateSchema, db: Session = Depe
 # Delete user
 @app.delete("/users/{user_id}")
 def delete_user(user_id: int, db: Session = Depends(get_db)):
+    log.info("DELETE: users")
     tasks = db.query(models.TaskEntity).filter(models.TaskEntity.user_id == user_id).all()
     if len(tasks) > 0: raise HTTPException(status_code=400, detail="User has tasks and cannot be deleted")
 
@@ -138,15 +146,16 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
 # seed database with data
 @app.get("/admin/seed/", status_code=status.HTTP_201_CREATED)
 def seed_data(db: Session = Depends(get_db)):
+    log.info("Seeding database")
     for i in range(1, 200):
         fake = Faker()
 
-        u =  schemas.UserSchema(fname=fake.first_name(), lname=fake.last_name())
+        u =  schemas.UserBaseSchema(fname=fake.first_name(), lname=fake.last_name())
         new_user = models.UserEntity(**u.dict())
         db.add(new_user)
         db.commit()
 
-        t =  schemas.TaskSchema(user_id=new_user.id,title=fake.text(20), description=fake.text(), completed=False, due_date=datetime.datetime.now() , created_by=fake.name())
+        t =  schemas.TaskPostSchema(user_id=new_user.id,title=fake.text(20), description=fake.text(), completed=False, due_date=datetime.datetime.now())
         new_task = models.TaskEntity(**t.dict())
         db.add(new_task)
         db.commit()
@@ -155,6 +164,7 @@ def seed_data(db: Session = Depends(get_db)):
 # clear database
 @app.delete("/admin/delete/", status_code=status.HTTP_200_OK)
 def delete_data(db: Session = Depends(get_db)):
+    log.info("Deleting all data")
     db.query(models.TaskEntity).delete()
     db.query(models.UserEntity).delete()
     db.commit()
