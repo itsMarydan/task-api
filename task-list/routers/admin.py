@@ -5,6 +5,7 @@ from models import models
 from log import log
 from db import get_db
 from faker import Faker
+import datetime
 
 
 # Initialize FastAPI app
