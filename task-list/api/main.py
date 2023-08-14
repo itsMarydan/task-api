@@ -260,7 +260,7 @@ async def bulk_delete_tasks(data: BulkDeleteData):
 
 
 # clear database
-@app.delete("/tasks/delete/", status_code=status.HTTP_200_OK)
+@app.delete("/tasks/delete", status_code=status.HTTP_200_OK)
 def seed_task():
     session = SessionLocal()
     service = TaskService(session)
