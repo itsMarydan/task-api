@@ -1,6 +1,0 @@
-fastapi==0.68.0
-uvicorn==0.15.0
-sqlalchemy==1.4.25
-psycopg2==2.9.1   # If you are using PostgreSQL as the database
-fastapi_utils==0.2.1
-Faker==19.2.0
