@@ -50,3 +50,6 @@ class TaskUpdateSchema(TaskBaseSchema):
     description: str
     completed: bool
     due_date: datetime
+
+class BulkDeleteData(BaseModel):
+    data: List[int]

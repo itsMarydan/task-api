@@ -18,6 +18,15 @@ class TaskService:
     def create(self, task: any):
         return self.task_repo.create(task)
 
+    def bulk_create(self, task_data, chunk_size=100):
+        return self.task_repo.bulk_create(task_data)
+
+    def bulk_update(self, task_data, chunk_size=100):
+        return self.task_repo.bulk_update(task_data)
+
+    def bulk_delete(self, task_ids):
+        return self.task_repo.bulk_delete(task_ids)
+
     def update(self, task_id: int, task: any):
         return self.task_repo.update(task_id, task)
 
