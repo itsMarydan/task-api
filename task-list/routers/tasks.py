@@ -17,10 +17,11 @@ router = APIRouter()
 
 # Get all tasks
 @router.get("/tasks", response_model=List[schemas.TaskSchema])
-def get_tasks(service: TaskService = Depends(), search: str = ''):
+def get_tasks(service: TaskService = Depends(), search: str = '', page: int = 1, limit: int = 100):
     try:
-        return service.get_all(search)
+        return service.get_all(search, page, limit)
     except Exception as e:
+        log.error(f"Error occurred: {e}")
         raise HTTPException(status_code=404, detail="problem loading tasks")
 
 

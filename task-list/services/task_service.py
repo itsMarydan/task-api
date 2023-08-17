@@ -6,8 +6,8 @@ class TaskService:
     def __init__(self, task_repo: TaskRepo  = Depends()):
         self.task_repo = task_repo
 
-    def get_all(self, search: str = ''):
-        return self.task_repo.get_all(search)
+    def get_all(self, search: str = '', page: int = 1, limit: int = 100):
+        return self.task_repo.get_all(search, page, limit)
 
     def get_by_id(self, task_id: int):
         return self.task_repo.get_by_id(task_id)
