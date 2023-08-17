@@ -2,18 +2,16 @@ import csv
 import json
 from io import StringIO
 
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, Request, File
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, status, File, Response
 from typing import List
 
 from helper import process_csv
 from schemas import schemas
 from log import log
-from schemas.schemas import BulkDeleteData
 from services.task_service import TaskService
 
 # Initialize FastAPI app
 router = APIRouter()
-
 
 # Get all tasks
 @router.get("/tasks", response_model=List[schemas.TaskSchema])
@@ -24,7 +22,6 @@ def get_tasks(service: TaskService = Depends(), search: str = '', page: int = 1,
         log.error(f"Error occurred: {e}")
         raise HTTPException(status_code=404, detail="problem loading tasks")
 
-
 # Get single task by id
 @router.get("/tasks/{task_id}", response_model=schemas.TaskSchema)
 def get_task(task_id: int, service: TaskService = Depends()):
@@ -33,9 +30,8 @@ def get_task(task_id: int, service: TaskService = Depends()):
     except Exception as e:
         raise HTTPException(status_code=404, detail="problem loading task")
 
-
 # Create task
-@router.post("/tasks", response_model=schemas.TaskSchema)
+@router.post("/tasks", response_model=schemas.TaskSchema, status_code=status.HTTP_201_CREATED)
 def create_task(task: schemas.TaskPostSchema, service: TaskService = Depends()):
     try:
         task = service.create(task)
@@ -44,8 +40,29 @@ def create_task(task: schemas.TaskPostSchema, service: TaskService = Depends()):
     except Exception as e:
         raise HTTPException(status_code=400, detail="problem creating task")
 
+# Update task
+@router.put("/tasks/{task_id}")
+def update_task(task_id: int, task: schemas.TaskUpdateSchema, service: TaskService = Depends()):
+    try:
+        existing_task = service.update(task_id, task)
+        if not existing_task: raise HTTPException(status_code=404, detail="Task not found")
+        return existing_task
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="problem updating task")
 
-@router.post("/tasks/bulk")
+# Delete task
+@router.delete("/tasks/{task_id}")
+def delete_task(task_id: int, service: TaskService = Depends()):
+    try:
+        return service.delete(task_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="problem deleting task")
+
+###########################
+#### Bulk create tasks ####
+###########################
+
+@router.post("/tasks/bulk", status_code=status.HTTP_201_CREATED)
 async def create_bulk_tasks(file: UploadFile = File(...), service: TaskService = Depends()):
     try:
         if file.filename.endswith('.csv'):
@@ -72,7 +89,6 @@ async def create_bulk_tasks(file: UploadFile = File(...), service: TaskService =
     except Exception as e:
         log.error(f"Error occurred: {e}")
         raise HTTPException(status_code=400, detail=str(e))
-
 
 @router.patch("/tasks/bulk")
 async def bulk_update_tasks(file: UploadFile = File(...), service: TaskService = Depends()):
@@ -103,7 +119,7 @@ async def bulk_update_tasks(file: UploadFile = File(...), service: TaskService =
 
 
 @router.delete("/tasks/bulk")
-async def bulk_delete_tasks(data: BulkDeleteData, service: TaskService = Depends()):
+async def bulk_delete_tasks(data: schemas.BulkDeleteData, service: TaskService = Depends()):
     data = data.data
     try:
         result = service.bulk_delete(data)
@@ -116,23 +132,3 @@ async def bulk_delete_tasks(data: BulkDeleteData, service: TaskService = Depends
     except Exception as e:
         log.error(f"Error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
-
-
-# Update task
-@router.put("/tasks/{task_id}")
-def update_task(task_id: int, task: schemas.TaskUpdateSchema, service: TaskService = Depends()):
-    try:
-        existing_task = service.update(task_id, task)
-        if not existing_task: raise HTTPException(status_code=404, detail="Task not found")
-        return existing_task
-    except Exception as e:
-        raise HTTPException(status_code=400, detail="problem updating task")
-
-
-# Delete task
-@router.delete("/tasks/{task_id}")
-def delete_task(task_id: int, service: TaskService = Depends()):
-    try:
-        return service.delete(task_id)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail="problem deleting task")

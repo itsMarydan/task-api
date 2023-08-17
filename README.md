@@ -26,5 +26,5 @@ If you have issues when running tests, make sure you have the following installe
 * psycopg2-binary (pip install psycopg2-binary)
 
 ## Also see:
-* [API documentation](api.md)
+* Swagger [API documentation](http:/localhost:8000/docs)
 * [DB schema](db.md)
