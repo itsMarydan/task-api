@@ -21,6 +21,10 @@ cd task-list
 uvicorn api.main:app --reload
 ```
 
+## Notes
+If you have issues when running tests, make sure you have the following installed:
+* psycopg2-binary (pip install psycopg2-binary)
+
 ## Also see:
 * [API documentation](api.md)
 * [DB schema](db.md)
