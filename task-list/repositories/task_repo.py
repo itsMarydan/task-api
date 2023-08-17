@@ -10,12 +10,14 @@ class TaskRepo:
     def __init__(self, db: Session = Depends(get_db)):
         self.db = db
 
-    def get_all(self, search: str = ''):
+    def get_all(self, search: str = '', page: int = 1, limit: int = 100):
         tasks = self.db.query(TaskEntity) \
         .options(joinedload(TaskEntity.user)) \
         .filter(or_(
             TaskEntity.title.contains(search),
-            TaskEntity.description.contains(search))).all()
+            TaskEntity.description.contains(search))).offset((page - 1) * limit).limit(limit).all()
+
+        log.info(f"Tasks: {tasks}")
         return tasks
 
     def get_by_id(self, task_id: int):
