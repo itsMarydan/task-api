@@ -4,3 +4,4 @@ sqlalchemy==2.0
 psycopg2==2.9.1
 fastapi-utils-sqlalch2==0.3.0
 Faker==19.2.0
+python-multipart==0.0.5
