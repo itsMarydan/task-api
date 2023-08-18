@@ -28,7 +28,7 @@ def get_user(user_id: int, service: UserService = Depends()):
         raise HTTPException(status_code=404, detail="problem loading user")
 
 # Create user
-@router.post("/users", response_model=schemas.UserSchema)
+@router.post("/users", response_model=schemas.UserSchema, status_code=status.HTTP_201_CREATED)
 def create_user(user: schemas.UserPostSchema, service: UserService = Depends()):
     try:
         user = service.create(user)
@@ -52,7 +52,7 @@ def update_user(user_id: int, user: schemas.UserUpdateSchema, service: UserServi
 def delete_user(user_id: int, user_service : UserService = Depends(), task_service : TaskService = Depends()):
     try:
         tasks = task_service.get_by_user_id(user_id)
-        if tasks: raise HTTPException(status_code=400, detail="User has tasks and cannot be deleted")
+        if tasks: return {"message": "User has tasks and cannot be delete"}
         return user_service.delete(user_id)
     except Exception as e:
         raise HTTPException(status_code=400, detail="problem deleting user")
